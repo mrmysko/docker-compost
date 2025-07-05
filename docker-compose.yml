@@ -1,0 +1,404 @@
+x-common-env: &common-env
+  TZ: ${TZ}
+  PUID: ${PUID}
+  PGID: ${PGID}
+  UMASK: ${UMASK}
+
+x-certs-volume: &certs-volume ${CERTS}:/certs:ro
+
+x-not-arr-labels: &not-arr-labels
+  homepage.group: Stuff
+  homepage.showStats: false
+
+x-arr-labels: &arr-labels
+  homepage.group: Arr
+  homepage.showStats: false
+
+x-logging-labels: &logging-labels
+  logging: promtail
+  jobname: container_logs
+
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:preview
+    container_name: jellyfin
+    hostname: jellyfin
+    profiles: ['not-arr']
+    user: ${PUID}:${PGID}
+    environment:
+      <<: *common-env
+    volumes:
+      # Config
+      - ${DOCKER_CONFIG}/jellyfin/config:/config
+      - ${DOCKER_CONFIG}/jellyfin/cache:/cache
+      - /media/docker/Jellyfin_Metadata:/metadata
+      - *certs-volume
+      # Media
+      - ${FILESHARE}/Videos:/videos
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - 8096:8096/tcp
+      - 8920:8920/tcp
+    networks:
+      - defaultNet
+    restart: "unless-stopped"
+    labels:
+      <<: *not-arr-labels
+      homepage.name: Jellyfin
+      homepage.icon: jellyfin.png
+      homepage.description: Movies & TV Shows
+      homepage.href: https://jellyfin.${DOMAIN}
+      homepage.showStats: false
+      homepage.weight: 10
+
+  freshrss:
+    image: freshrss/freshrss:latest
+    container_name: freshrss
+    hostname: freshrss
+    profiles: ['not-arr']
+    environment:
+      <<: *common-env
+      CRON_MIN: "*/15"
+      DB_TYPE: ${RSS_DB_TYPE}
+      DB_HOST: ${RSS_DB_HOST}
+      DB_BASE: ${RSS_DB_BASE}
+      DB_USER: ${RSS_DB_USER}
+      DB_PASSWORD: ${RSS_DB_PASS}
+      OIDC_ENABLED: 1
+      OIDC_PROVIDER_METADATA_URL: ${OIDC_PROVIDER_METADATA_URL}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+      OIDC_X_FORWARDED_HEADERS: ${OIDC_X_FORWARDED_HEADERS}
+      OIDC_SCOPES: ${OIDC_SCOPES}
+      OIDC_CLIENT_CRYPTO_KEY: ${OIDC_CLIENT_CRYPTO_KEY}
+      OIDC_REMOTE_USER_CLAIM: ${OIDC_REMOTE_USER_CLAIM}
+    volumes:
+      - ${DOCKER_CONFIG}/freshrss/data:/var/www/FreshRSS/data
+      - ${DOCKER_CONFIG}/freshrss/extensions:/var/www/FreshRSS/extensions
+      - *certs-volume
+    ports:
+      - 181:80
+    networks:
+      - defaultNet
+    restart: "unless-stopped"
+    labels:
+      <<: *not-arr-labels
+      homepage.name: FreshRSS
+      homepage.icon: freshrss.png
+      homepage.description: RSS Reader
+      homepage.href: https://rss.${DOMAIN}
+      homepage.weight: 30
+      homepage.widget.type: freshrss
+      homepage.widget.url: https://rss.${DOMAIN}
+      homepage.widget.username: ${HOMEPAGE_FRESHRSS_USER}
+      homepage.widget.password: ${HOMEPAGE_FRESHRSS_PASS}
+
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    profiles: ['not-arr']
+    environment:
+      TZ: ${TZ}
+      HOMEPAGE_ALLOWED_HOSTS: homepage.${DOMAIN}
+    volumes:
+      - ${DOCKER_CONFIG}/homepage:/app/config
+      - ${DOCKER_CONFIG}/homepage/images:/app/public/images
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "3000:3000"
+    networks:
+      - defaultNet
+    restart: "unless-stopped"
+
+## Arr ##
+  gluetun:
+    image: qmcgaw/gluetun
+    container_name: gluetun
+    profiles: ['arr']
+    environment:
+      <<: *common-env
+      # Mullvad-WG
+      VPN_SERVICE_PROVIDER: mullvad
+      VPN_TYPE: wireguard
+      WIREGUARD_PRIVATE_KEY: ${WIREGUARD_PRIVATE_KEY}
+      WIREGUARD_ADDRESSES: 10.73.70.3/32
+      VPN_ENDPOINT_PORT: 52001
+      SERVER_COUNTRIES: Sweden
+
+      # Options
+      SHADOWSOCKS: off
+      FIREWALL: on
+      FIREWALL_OUTBOUND_SUBNETS: 10.40.40.0/24,10.255.255.0/24
+      DOT: on
+      UPDATER_PERIOD: 48h
+      OWNED_ONLY: on
+    ports:
+      - 8000:8000/tcp # Homepage IP parse
+      - 6555:6555/tcp # qBit Web GUI
+      - 6868:6868/tcp # Profilarr
+      - 6767:6767/tcp # Bazarr
+      - 9898:9898/tcp # Radarr TLS
+      - 9897:9897/tcp # Sonarr TLS
+      - 6969:6969/tcp # Prowlarr TLS
+      - 9705:9705/tcp # Huntarr
+    volumes:
+      - ${DOCKER_CONFIG}/gluetun:/gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    networks:
+      - "arrNet"
+    restart: "unless-stopped"
+    labels:
+      <<: *arr-labels
+      homepage.name: Gluetun
+      homepage.icon: mullvad.png
+      homepage.widget.type: gluetun
+      homepage.widget.url: http://docker.internal.${DOMAIN}:8000
+      homepage.weight: 10
+
+  qbit:
+    image: 11notes/qbittorrent:5.1.1
+    container_name: qbit
+    profiles: ['arr']
+    user: ${PUID}:${PGID}
+    environment:
+      TZ: ${TZ}
+    volumes:
+      - "qbittorrent.etc:/qbittorrent/etc"
+      - "qbittorrent.var:/qbittorrent/var"
+      - ${FILESHARE}/Downloads:/downloads
+    network_mode: "service:gluetun"
+    restart: "unless-stopped"
+    labels:
+      <<: *arr-labels
+      homepage.name: qBittorrent
+      homepage.icon: qbittorrent.png
+      homepage.description: Torrent Client
+      homepage.href: https://qbit.${DOMAIN}
+      homepage.weight: 50
+
+  sonarr:
+    #image: lscr.io/linuxserver/sonarr:develop
+    image: "11notes/sonarr:4.0.15"
+    container_name: sonarr
+    read_only: true
+    profiles: ['arr']
+    user: ${PUID}:${PGID}
+    environment:
+      TZ: ${TZ}
+    volumes:
+      - "sonarr.etc:/sonarr/etc"
+      - ${FILESHARE}/Backups/sonarr:/config/backups
+      - ${FILESHARE}/Videos/Series:/series
+      - ${FILESHARE}/Videos/Anime:/anime
+      - ${FILESHARE}/Downloads:/downloads
+      - /media/docker/Sonarr_MediaCover:/sonarr/etc/MediaCover
+      - *certs-volume
+    tmpfs:
+      - "/tmp:uid=${PUID},gid=${PGID}"
+    network_mode: "service:gluetun"
+    restart: "unless-stopped"
+    labels:
+      <<: *arr-labels
+      homepage.name: Sonarr
+      homepage.icon: sonarr.png
+      homepage.description: Download TV Shows
+      homepage.href: https://sonarr.${DOMAIN}
+      homepage.weight: 30
+      homepage.widget.type: sonarr
+      homepage.widget.url: https://docker.internal.${DOMAIN}:9897
+      homepage.widget.key: ${SONARR_API_KEY}
+
+  radarr:
+    image: "11notes/radarr:5.26.2"
+    container_name: radarr
+    read_only: true
+    profiles: ['arr']
+    user: ${PUID}:${PGID}
+    environment:
+      TS: ${TZ}
+    volumes:
+      - "radarr.etc:/radarr/etc"
+      - ${FILESHARE}/Backups/radarr:/config/backups
+      - ${FILESHARE}/Videos/Movies:/movies
+      - ${FILESHARE}/Videos/Animemovies:/animemovies
+      - ${FILESHARE}/Downloads:/downloads
+      - ${DOCKER_CONFIG}/scripts/clean-video:/clean-video
+      - /media/docker/Radarr_MediaCover:/radarr/etc/MediaCover
+      - *certs-volume
+    tmpfs:
+      - "/tmp:uid=${PUID},gid=${PGID}"
+    network_mode: "service:gluetun"
+    restart: "unless-stopped"
+    labels:
+      <<: *arr-labels
+      homepage.name: Radarr
+      homepage.icon: radarr.png
+      homepage.description: Download Movies
+      homepage.href: https://radarr.${DOMAIN}
+      homepage.weight: 30
+      homepage.widget.type: radarr
+      homepage.widget.url: https://docker.internal.${DOMAIN}:9898
+      homepage.widget.key: ${RADARR_API_KEY}
+
+  prowlarr:
+    image: "11notes/prowlarr:1.37.0"
+    container_name: prowlarr
+    read_only: true
+    profiles: ['arr']
+    user: ${PUID}:${PGID}
+    environment:
+      TZ: ${TZ}
+    volumes:
+      - "prowlarr.etc:/prowlarr/etc"
+      - ${FILESHARE}/Backups/prowlarr:/config/backups
+      - *certs-volume
+    tmpfs:
+      - "/tmp:uid=${PUID},gid=${PGID}"
+    network_mode: "service:gluetun"
+    restart: "unless-stopped"
+    labels:
+      <<: *arr-labels
+      homepage.name: Prowlarr
+      homepage.icon: prowlarr.png
+      homepage.description: Index Manager
+      homepage.href: https://prowlarr.${DOMAIN}
+      homepage.weight: 31
+
+  bazarr:
+    image: lscr.io/linuxserver/bazarr
+    container_name: bazarr
+    profiles: ['arr']
+    environment:
+      <<: *common-env
+    volumes:
+      - ${DOCKER_CONFIG}/bazarr:/config
+      - ${FILESHARE}/Backups/bazarr:/config/backups
+      - ./scripts/subcleaner:/subcleaner
+      - ${FILESHARE}/Videos/Movies:/movies
+      - ${FILESHARE}/Videos/Series:/series
+      - ${FILESHARE}/Videos/Animemovies:/animemovies
+      - ${FILESHARE}/Videos/Anime:/anime
+    network_mode: "service:gluetun"
+    restart: "unless-stopped"
+    labels:
+      <<: *arr-labels
+      homepage.name: Bazarr
+      homepage.icon: bazarr.png
+      homepage.description: Download Subtitles
+      homepage.href: https://bazarr.${DOMAIN}
+      homepage.weight: 31
+
+  huntarr:
+    image: huntarr/huntarr:latest
+    container_name: huntarr
+    profiles: ['arr']
+    environment:
+      <<: *common-env
+    volumes:
+      - ${DOCKER_CONFIG}/huntarr:/config
+    network_mode: "service:gluetun"
+    restart: "unless-stopped"
+    labels:
+      <<: *arr-labels
+      homepage.name: Huntarr
+      homepage.icon: huntarr.png
+      homepage.description: Fetch media upgrades
+      homepage.href: https://huntarr.${DOMAIN}
+      homepage.weight: 31
+
+# -----END------
+
+  immich-server:
+    container_name: immich_server
+    profiles: ['immich']
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+    volumes:
+      - ${IMMICH_UPLOAD_LOCATION}:/usr/src/app/upload
+    env_file:
+      - .env.immich
+    ports:
+      - 2283:2283
+    depends_on:
+      - redis
+      - database
+    extends:
+      file: ${DOCKER_CONFIG}/immich/hwaccel.transcoding.yml
+      service: nvenc # [nvenc, quicksync, rkmpp, vaapi, vaapi-wsl]
+    networks:
+      - immichNet
+      - defaultNet
+    restart: always
+    labels:
+      <<: *not-arr-labels
+      homepage.name: Immich
+      homepage.icon: immich.png
+      homepage.description: Photo Manager
+      homepage.href: https://immich.${DOMAIN}
+      homepage.weight: 40
+
+  immich-machine-learning:
+    container_name: immich_machine_learning
+    profiles: ['immich']
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}-cuda
+    volumes:
+      - immich_model-cache:/cache
+    env_file:
+      - .env.immich
+    extends:
+      file: ${DOCKER_CONFIG}/immich/hwaccel.ml.yml
+      service: cuda # [armnn, cuda, openvino, openvino-wsl]
+    networks:
+      - immichNet
+    restart: always
+
+  redis:
+    container_name: immich_redis
+    profiles: ['immich']
+    image: redis:6.2-alpine@sha256:70a7a5b641117670beae0d80658430853896b5ef269ccf00d1827427e3263fa3
+    networks:
+      - immichNet
+    restart: always
+
+  database:
+    container_name: immich_postgres
+    profiles: ['immich']
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.3.0-pgvectors0.2.0
+    env_file:
+      - .env.immich
+    volumes:
+      - immich_pgdata:/var/lib/postgresql/data
+    networks:
+      - immichNet
+    restart: always
+
+volumes:
+  qbittorrent.etc:
+  qbittorrent.var:
+  sonarr.etc:
+  radarr.etc:
+  prowlarr.etc:
+  immich_pgdata:
+    external: true
+  immich_model-cache:
+    external: true
+
+networks:
+  defaultNet:
+    name: defaultNet
+    driver: bridge
+  arrNet:
+    name: arrNet
+    driver: bridge
+  immichNet:
+    name: immichNet
+    driver: bridge
