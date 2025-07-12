@@ -9,7 +9,11 @@ on:
   schedule:
     - cron: '0 8 * * *'
   workflow_dispatch:
-
+  
+permissions:
+  contents: write
+  packages: write
+  
 jobs:
   check-and-build:
     runs-on: ubuntu-latest
