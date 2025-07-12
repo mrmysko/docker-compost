@@ -68,6 +68,7 @@ jobs:
 
       - name: Build and push the Docker image
         if: steps.check-hash.outputs.zip-updated == 'true'
+        working-directory: ./freshrss
         run: |
           echo "Building Docker image because FreshRSS was updated..."
           docker build . --file Dockerfile --tag ghcr.io/${{ github.repository }}/789548356823:latest
