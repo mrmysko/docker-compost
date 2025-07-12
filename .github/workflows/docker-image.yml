@@ -54,7 +54,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add hash.txt
+          git add .github/cache/hash.txt
           git commit -m "Update FreshRSS hash: ${{ steps.check-hash.outputs.new-hash }}" || exit 0
           git push
       
