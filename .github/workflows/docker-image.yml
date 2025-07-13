@@ -49,6 +49,18 @@ jobs:
             echo "No changes detected in FreshRSS zip"
           fi
 
+      - name: Determine if build is needed
+        id: should-build
+        run: |
+          # Build if FreshRSS was updated OR if triggered by push event
+          if [ "${{ steps.check-hash.outputs.zip-updated }}" == "true" ] || [ "${{ github.event_name }}" == "push" ]; then
+            echo "should-build=true" >> $GITHUB_OUTPUT
+            echo "Build will proceed"
+          else
+            echo "should-build=false" >> $GITHUB_OUTPUT
+            echo "No build needed"
+          fi
+
       - name: Update hash file
         if: steps.check-hash.outputs.zip-updated == 'true'
         run: |
@@ -73,14 +85,14 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push the Docker image
-        if: steps.check-hash.outputs.zip-updated == 'true'
+        if: steps.check-hash.outputs.should-build == 'true'
         working-directory: ./freshrss
         run: |
-          echo "Building Docker image because FreshRSS was updated..."
+          echo "Building Docker image"
           docker build . --file Dockerfile --tag ghcr.io/${{ github.repository }}/789548356823:latest
           docker push ghcr.io/${{ github.repository }}/789548356823:latest
 
       - name: Skip build
-        if: steps.check-hash.outputs.zip-updated == 'false'
+        if: steps.check-hash.outputs.should-build == 'false'
         run: |
           echo "Skipping Docker build - no changes detected"
