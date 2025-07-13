@@ -7,7 +7,7 @@ UPDATE_INTERVAL=${UPDATE_INTERVAL:-1200}
 # Background updater
 nohup bash -c '
     while true; do
-        php /usr/share/FreshRSS/app/actualize_script.php > /dev/null 2>&1
+        php /var/www/FreshRSS/app/actualize_script.php > /dev/null 2>&1
         echo "Feed update completed at $(date)"
         sleep '"$UPDATE_INTERVAL"'
     done
