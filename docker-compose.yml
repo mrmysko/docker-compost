@@ -20,7 +20,7 @@ x-logging-labels: &logging-labels
 
 services:
   jellyfin:
-    image: jellyfin/jellyfin:preview
+    image: jellyfin/jellyfin:10.11.0-rc5
     container_name: jellyfin
     hostname: jellyfin
     profiles: ['not-arr']
@@ -31,10 +31,10 @@ services:
       # Config
       - ${DOCKER_CONFIG}/jellyfin/config:/config
       - ${DOCKER_CONFIG}/jellyfin/cache:/cache
-      - /media/docker/Jellyfin_Metadata:/metadata
+      - ${FILESHARE}/Jellyfin_Metadata:/metadata
       - *certs-volume
       # Media
-      - ${FILESHARE}/Videos:/videos
+      - ${FILESHARE}:/videos
     runtime: nvidia
     deploy:
       resources:
@@ -62,7 +62,7 @@ services:
     image: freshrss/freshrss:latest
     container_name: freshrss
     hostname: freshrss
-    profiles: ['not-arr']
+    profiles: ['disabled']
     environment:
       <<: *common-env
       CRON_MIN: "*/15"
@@ -103,7 +103,7 @@ services:
   homepage:
     image: ghcr.io/gethomepage/homepage:latest
     container_name: homepage
-    profiles: ['not-arr']
+    profiles: ['disabled']
     environment:
       TZ: ${TZ}
       HOMEPAGE_ALLOWED_HOSTS: homepage.${DOMAIN}
@@ -129,7 +129,7 @@ services:
       VPN_TYPE: wireguard
       WIREGUARD_PRIVATE_KEY: ${WIREGUARD_PRIVATE_KEY}
       WIREGUARD_ADDRESSES: 10.73.70.3/32
-      VPN_ENDPOINT_PORT: 52001
+      WIREGUARD_ENDPOINT_PORT: 52001
       SERVER_COUNTRIES: Sweden
 
       # Options
@@ -197,11 +197,11 @@ services:
       TZ: ${TZ}
     volumes:
       - "sonarr.etc:/sonarr/etc"
-      - ${FILESHARE}/Backups/sonarr:/config/backups
-      - ${FILESHARE}/Videos/Series:/series
-      - ${FILESHARE}/Videos/Anime:/anime
+      - ${ARR_BACKUPS}/sonarr:/config/backups
+      - ${FILESHARE}/Series:/series
+      - ${FILESHARE}/Anime:/anime
       - ${FILESHARE}/Downloads:/downloads
-      - /media/docker/Sonarr_MediaCover:/sonarr/etc/MediaCover
+      - ${FILESHARE}/Sonarr_MediaCover:/sonarr/etc/MediaCover
       - *certs-volume
     tmpfs:
       - "/tmp:uid=${PUID},gid=${PGID}"
@@ -228,12 +228,12 @@ services:
       TS: ${TZ}
     volumes:
       - "radarr.etc:/radarr/etc"
-      - ${FILESHARE}/Backups/radarr:/config/backups
-      - ${FILESHARE}/Videos/Movies:/movies
-      - ${FILESHARE}/Videos/Animemovies:/animemovies
+      - ${ARR_BACKUPS}/radarr:/config/backups
+      - ${FILESHARE}/Movies:/movies
+      - ${FILESHARE}/Animemovies:/animemovies
       - ${FILESHARE}/Downloads:/downloads
       - ${DOCKER_CONFIG}/scripts/clean-video:/clean-video
-      - /media/docker/Radarr_MediaCover:/radarr/etc/MediaCover
+      - ${FILESHARE}/Radarr_MediaCover:/radarr/etc/MediaCover
       - *certs-volume
     tmpfs:
       - "/tmp:uid=${PUID},gid=${PGID}"
@@ -260,7 +260,7 @@ services:
       TZ: ${TZ}
     volumes:
       - "prowlarr.etc:/prowlarr/etc"
-      - ${FILESHARE}/Backups/prowlarr:/config/backups
+      - ${ARR_BACKUPS}/prowlarr:/config/backups
       - *certs-volume
     tmpfs:
       - "/tmp:uid=${PUID},gid=${PGID}"
@@ -282,12 +282,12 @@ services:
       <<: *common-env
     volumes:
       - ${DOCKER_CONFIG}/bazarr:/config
-      - ${FILESHARE}/Backups/bazarr:/config/backups
-      - ./scripts/subcleaner:/subcleaner
-      - ${FILESHARE}/Videos/Movies:/movies
-      - ${FILESHARE}/Videos/Series:/series
-      - ${FILESHARE}/Videos/Animemovies:/animemovies
-      - ${FILESHARE}/Videos/Anime:/anime
+      - ${ARR_BACKUPS}/bazarr:/config/backups
+      - ${DOCKER_CONFIG}/scripts/subcleaner:/subcleaner
+      - ${FILESHARE}/Movies:/movies
+      - ${FILESHARE}/Series:/series
+      - ${FILESHARE}/Animemovies:/animemovies
+      - ${FILESHARE}/Anime:/anime
     network_mode: "service:gluetun"
     restart: "unless-stopped"
     labels:
@@ -320,7 +320,7 @@ services:
 
   immich-server:
     container_name: immich_server
-    profiles: ['immich']
+    profiles: ['disabled']
     image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
     volumes:
       - ${IMMICH_UPLOAD_LOCATION}:/usr/src/app/upload
@@ -354,6 +354,9 @@ services:
       - immich_model-cache:/cache
     env_file:
       - .env.immich
+    # External access
+    ports:
+      - 3003:3003
     extends:
       file: ${DOCKER_CONFIG}/immich/hwaccel.ml.yml
       service: cuda # [armnn, cuda, openvino, openvino-wsl]
@@ -363,7 +366,7 @@ services:
 
   redis:
     container_name: immich_redis
-    profiles: ['immich']
+    profiles: ['disabled']
     image: redis:6.2-alpine@sha256:70a7a5b641117670beae0d80658430853896b5ef269ccf00d1827427e3263fa3
     networks:
       - immichNet
@@ -371,7 +374,7 @@ services:
 
   database:
     container_name: immich_postgres
-    profiles: ['immich']
+    profiles: ['disabled']
     image: ghcr.io/immich-app/postgres:14-vectorchord0.3.0-pgvectors0.2.0
     env_file:
       - .env.immich
