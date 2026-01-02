@@ -40,7 +40,7 @@ RUN a2dismod -q -f alias autoindex negotiation status && \
 
 # Download and unzip FreshRSS
 ADD https://github.com/FreshRSS/FreshRSS/archive/latest.zip /tmp/latest.zip
-RUN unzip /tmp/latest.zip -d /var/www/ && mv /var/www/FreshRSS-latest /var/www/FreshRSS
+RUN unzip /tmp/latest.zip -d /var/www/ && mv /var/www/FreshRSS-latest /var/www/FreshRSS && rm /tmp/latest.zip
 
 COPY config.php /var/www/FreshRSS/data/
 
