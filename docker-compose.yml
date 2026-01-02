@@ -19,8 +19,51 @@ x-logging-labels: &logging-labels
   jobname: container_logs
 
 services:
+  tdarr:
+    image: "ghcr.io/haveagitgat/tdarr:latest"
+    container_name: tdarr
+    profiles: ['not-arr']
+    environment:
+      <<: *common-env
+      serverIP: 0.0.0.0
+      serverPort: 8266
+      webUIPort: 8265
+      internalNode: true
+      inContainer: true
+      ffmpegVersion: 7
+      nodeName: TdarrServer
+      auth: false
+      openBrowser: true
+      maxLogSizeMB: 10
+      cronPluginUpdate:
+    volumes:
+      - ${DOCKER_CONFIG}/tdarr/server:/app/server
+      - ${DOCKER_CONFIG}/tdarr/configs:/app/configs
+      - ${DOCKER_CONFIG}/tdarr/logs:/app/logs
+      - ${FILESHARE}:/data
+      - ${DOCKER_CONFIG}/tdarr/transcode_cache:/temp
+    ports:
+      - 8265:8265 # webUI port
+      - 8266:8266 # server port
+    networks:
+      - defaultNet
+    restart: unless-stopped
+    group_add:
+      - '105'
+    devices:
+      - /dev/dri/card0:/dev/dri/card0
+      - /dev/dri/renderD128:/dev/dri/renderD128
+    labels:
+      <<: *not-arr-labels
+      homepage.name: Tdarr
+      homepage.icon: tdarr.png
+      homepage.description: Transcoding Pipeline
+      homepage.href: https://tdarr.${DOMAIN}
+      homepage.showStats: false
+      homepage.weight: 15
+
   jellyfin:
-    image: jellyfin/jellyfin:10.11.0-rc5
+    image: "jellyfin/jellyfin:10.11"
     container_name: jellyfin
     hostname: jellyfin
     profiles: ['not-arr']
@@ -31,24 +74,19 @@ services:
       # Config
       - ${DOCKER_CONFIG}/jellyfin/config:/config
       - ${DOCKER_CONFIG}/jellyfin/cache:/cache
-      - ${FILESHARE}/Jellyfin_Metadata:/metadata
-      - *certs-volume
       # Media
       - ${FILESHARE}:/videos
-    runtime: nvidia
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
     ports:
       - 8096:8096/tcp
       - 8920:8920/tcp
     networks:
       - defaultNet
     restart: "unless-stopped"
+    group_add:
+      - '105'
+    devices:
+      - /dev/dri/card0:/dev/dri/card0
+      - /dev/dri/renderD128:/dev/dri/renderD128
     labels:
       <<: *not-arr-labels
       homepage.name: Jellyfin
@@ -59,7 +97,7 @@ services:
       homepage.weight: 10
 
   freshrss:
-    image: freshrss/freshrss:latest
+    image: "freshrss/freshrss:latest"
     container_name: freshrss
     hostname: freshrss
     profiles: ['disabled']
@@ -101,7 +139,7 @@ services:
       homepage.widget.password: ${HOMEPAGE_FRESHRSS_PASS}
 
   homepage:
-    image: ghcr.io/gethomepage/homepage:latest
+    image: "ghcr.io/gethomepage/homepage:latest"
     container_name: homepage
     profiles: ['disabled']
     environment:
@@ -119,7 +157,7 @@ services:
 
 ## Arr ##
   gluetun:
-    image: qmcgaw/gluetun
+    image: "qmcgaw/gluetun"
     container_name: gluetun
     profiles: ['arr']
     environment:
@@ -166,7 +204,7 @@ services:
       homepage.weight: 10
 
   qbit:
-    image: 11notes/qbittorrent:5.1.1
+    image: "11notes/qbittorrent:5.1.4"
     container_name: qbit
     profiles: ['arr']
     user: ${PUID}:${PGID}
@@ -175,7 +213,8 @@ services:
     volumes:
       - "qbittorrent.etc:/qbittorrent/etc"
       - "qbittorrent.var:/qbittorrent/var"
-      - ${FILESHARE}/Downloads:/downloads
+      # To conform with arrs directory mappings without using path mappings
+      - ${FILESHARE}/Downloads:/data/Downloads
     network_mode: "service:gluetun"
     restart: "unless-stopped"
     labels:
@@ -187,7 +226,6 @@ services:
       homepage.weight: 50
 
   sonarr:
-    #image: lscr.io/linuxserver/sonarr:develop
     image: "11notes/sonarr:4.0.15"
     container_name: sonarr
     read_only: true
@@ -198,10 +236,7 @@ services:
     volumes:
       - "sonarr.etc:/sonarr/etc"
       - ${ARR_BACKUPS}/sonarr:/config/backups
-      - ${FILESHARE}/Series:/series
-      - ${FILESHARE}/Anime:/anime
-      - ${FILESHARE}/Downloads:/downloads
-      - ${FILESHARE}/Sonarr_MediaCover:/sonarr/etc/MediaCover
+      - ${FILESHARE}:/data
       - *certs-volume
     tmpfs:
       - "/tmp:uid=${PUID},gid=${PGID}"
@@ -219,7 +254,7 @@ services:
       homepage.widget.key: ${SONARR_API_KEY}
 
   radarr:
-    image: "11notes/radarr:5.26.2"
+    image: "11notes/radarr:6"
     container_name: radarr
     read_only: true
     profiles: ['arr']
@@ -229,11 +264,7 @@ services:
     volumes:
       - "radarr.etc:/radarr/etc"
       - ${ARR_BACKUPS}/radarr:/config/backups
-      - ${FILESHARE}/Movies:/movies
-      - ${FILESHARE}/Animemovies:/animemovies
-      - ${FILESHARE}/Downloads:/downloads
-      - ${DOCKER_CONFIG}/scripts/clean-video:/clean-video
-      - ${FILESHARE}/Radarr_MediaCover:/radarr/etc/MediaCover
+      - ${FILESHARE}:/data
       - *certs-volume
     tmpfs:
       - "/tmp:uid=${PUID},gid=${PGID}"
@@ -251,7 +282,7 @@ services:
       homepage.widget.key: ${RADARR_API_KEY}
 
   prowlarr:
-    image: "11notes/prowlarr:1.37.0"
+    image: "11notes/prowlarr:2.3.0"
     container_name: prowlarr
     read_only: true
     profiles: ['arr']
@@ -275,19 +306,16 @@ services:
       homepage.weight: 31
 
   bazarr:
-    image: lscr.io/linuxserver/bazarr
+    image: "lscr.io/linuxserver/bazarr"
     container_name: bazarr
-    profiles: ['arr']
+    profiles: ['disabled']
     environment:
       <<: *common-env
     volumes:
       - ${DOCKER_CONFIG}/bazarr:/config
       - ${ARR_BACKUPS}/bazarr:/config/backups
+      - ${FILESHARE}:/data
       - ${DOCKER_CONFIG}/scripts/subcleaner:/subcleaner
-      - ${FILESHARE}/Movies:/movies
-      - ${FILESHARE}/Series:/series
-      - ${FILESHARE}/Animemovies:/animemovies
-      - ${FILESHARE}/Anime:/anime
     network_mode: "service:gluetun"
     restart: "unless-stopped"
     labels:
@@ -299,7 +327,7 @@ services:
       homepage.weight: 31
 
   huntarr:
-    image: huntarr/huntarr:latest
+    image: "huntarr/huntarr:latest"
     container_name: huntarr
     profiles: ['arr']
     environment:
@@ -349,7 +377,7 @@ services:
   immich-machine-learning:
     container_name: immich_machine_learning
     profiles: ['immich']
-    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}-cuda
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}-openvino
     volumes:
       - immich_model-cache:/cache
     env_file:
@@ -359,7 +387,9 @@ services:
       - 3003:3003
     extends:
       file: ${DOCKER_CONFIG}/immich/hwaccel.ml.yml
-      service: cuda # [armnn, cuda, openvino, openvino-wsl]
+      service: openvino # [armnn, cuda, openvino, openvino-wsl]
+    group_add:
+      - '105'
     networks:
       - immichNet
     restart: always
