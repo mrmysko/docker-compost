@@ -188,7 +188,7 @@ services:
       - 6969:6969/tcp # Prowlarr TLS
       - 9705:9705/tcp # Huntarr
     volumes:
-      - ${DOCKER_CONFIG}/gluetun:/gluetun
+      - "gluetun.conf:/gluetun"
     cap_add:
       - NET_ADMIN
     devices:
@@ -380,7 +380,7 @@ services:
     profiles: ['immich']
     image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}-openvino
     volumes:
-      - immich_model-cache:/cache
+      - "immich_model-cache:/cache"
     env_file:
       - .env.immich
     # External access
@@ -410,13 +410,14 @@ services:
     env_file:
       - .env.immich
     volumes:
-      - immich_pgdata:/var/lib/postgresql/data
+      - "immich_pgdata:/var/lib/postgresql/data"
     networks:
       - immichNet
     restart: always
 
 volumes:
   jellyfin.conf:
+  gluetun.conf:
   qbittorrent.etc:
   qbittorrent.var:
   sonarr.etc:
