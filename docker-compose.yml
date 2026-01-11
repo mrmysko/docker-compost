@@ -98,7 +98,7 @@ services:
       homepage.weight: 10
 
   freshrss:
-    image: "freshrss/freshrss:latest"
+    image: "freshrss/freshrss:1.28.0"
     container_name: freshrss
     hostname: freshrss
     profiles: ['disabled']
@@ -140,7 +140,7 @@ services:
       homepage.widget.password: ${HOMEPAGE_FRESHRSS_PASS}
 
   homepage:
-    image: "ghcr.io/gethomepage/homepage:latest"
+    image: "ghcr.io/gethomepage/homepage:v1"
     container_name: homepage
     profiles: ['disabled']
     environment:
@@ -158,7 +158,7 @@ services:
 
 ## Arr ##
   gluetun:
-    image: "qmcgaw/gluetun"
+    image: "qmcgaw/gluetun:v3"
     container_name: gluetun
     profiles: ['arr']
     environment:
@@ -327,7 +327,7 @@ services:
       homepage.weight: 31
 
   huntarr:
-    image: "huntarr/huntarr:latest"
+    image: "huntarr/huntarr:8.2.11"
     container_name: huntarr
     profiles: ['arr']
     user: ${PUID}:${PGID}
