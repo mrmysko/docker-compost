@@ -72,10 +72,11 @@ services:
       <<: *common-env
     volumes:
       # Config
-      - ${DOCKER_CONFIG}/jellyfin/config:/config
-      - ${DOCKER_CONFIG}/jellyfin/cache:/cache
+      - jellyfin.conf:/config
       # Media
       - ${FILESHARE}:/videos
+    tmpfs:
+      - "/cache:uid=${PUID},gid=${PGID}"
     ports:
       - 8096:8096/tcp
       - 8920:8920/tcp
@@ -415,6 +416,7 @@ services:
     restart: always
 
 volumes:
+  jellyfin.conf:
   qbittorrent.etc:
   qbittorrent.var:
   sonarr.etc:
