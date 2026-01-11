@@ -72,7 +72,7 @@ services:
       <<: *common-env
     volumes:
       # Config
-      - jellyfin.conf:/config
+      - "jellyfin.conf:/config"
       # Media
       - ${FILESHARE}:/videos
     tmpfs:
@@ -316,7 +316,6 @@ services:
       - ${DOCKER_CONFIG}/bazarr:/config
       - ${ARR_BACKUPS}/bazarr:/config/backups
       - ${FILESHARE}:/data
-      - ${DOCKER_CONFIG}/scripts/subcleaner:/subcleaner
     network_mode: "service:gluetun"
     restart: "unless-stopped"
     labels:
@@ -331,10 +330,11 @@ services:
     image: "huntarr/huntarr:latest"
     container_name: huntarr
     profiles: ['arr']
+    user: ${PUID}:${PGID}
     environment:
       <<: *common-env
     volumes:
-      - ${DOCKER_CONFIG}/huntarr:/config
+      - "huntarr.conf:/config"
     network_mode: "service:gluetun"
     restart: "unless-stopped"
     labels:
@@ -422,6 +422,7 @@ volumes:
   sonarr.etc:
   radarr.etc:
   prowlarr.etc:
+  huntarr.conf:
   immich_pgdata:
     external: true
   immich_model-cache:
