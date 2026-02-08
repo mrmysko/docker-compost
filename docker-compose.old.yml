@@ -1,0 +1,80 @@
+# Old compose templates
+services:
+  freshrss:
+    image: "freshrss/freshrss:1.28.0"
+    container_name: freshrss
+    hostname: freshrss
+    profiles: ['disabled']
+    environment:
+      <<: *common-env
+      CRON_MIN: "*/15"
+      DB_TYPE: ${RSS_DB_TYPE}
+      DB_HOST: ${RSS_DB_HOST}
+      DB_BASE: ${RSS_DB_BASE}
+      DB_USER: ${RSS_DB_USER}
+      DB_PASSWORD: ${RSS_DB_PASS}
+      OIDC_ENABLED: 1
+      OIDC_PROVIDER_METADATA_URL: ${OIDC_PROVIDER_METADATA_URL}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+      OIDC_X_FORWARDED_HEADERS: ${OIDC_X_FORWARDED_HEADERS}
+      OIDC_SCOPES: ${OIDC_SCOPES}
+      OIDC_CLIENT_CRYPTO_KEY: ${OIDC_CLIENT_CRYPTO_KEY}
+      OIDC_REMOTE_USER_CLAIM: ${OIDC_REMOTE_USER_CLAIM}
+    volumes:
+      - ${DOCKER_CONFIG}/freshrss/data:/var/www/FreshRSS/data
+      - ${DOCKER_CONFIG}/freshrss/extensions:/var/www/FreshRSS/extensions
+      - *certs-volume
+    ports:
+      - 181:80
+    networks:
+      - defaultNet
+    restart: "unless-stopped"
+    labels:
+      <<: *not-arr-labels
+      homepage.name: FreshRSS
+      homepage.icon: freshrss.png
+      homepage.description: RSS Reader
+      homepage.href: https://rss.${DOMAIN}
+      homepage.weight: 30
+      homepage.widget.type: freshrss
+      homepage.widget.url: https://rss.${DOMAIN}
+      homepage.widget.username: ${HOMEPAGE_FRESHRSS_USER}
+      homepage.widget.password: ${HOMEPAGE_FRESHRSS_PASS}
+
+  homepage:
+    image: "ghcr.io/gethomepage/homepage:v1"
+    container_name: homepage
+    profiles: ['disabled']
+    environment:
+      TZ: ${TZ}
+      HOMEPAGE_ALLOWED_HOSTS: homepage.${DOMAIN}
+    volumes:
+      - ${DOCKER_CONFIG}/homepage:/app/config
+      - ${DOCKER_CONFIG}/homepage/images:/app/public/images
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "3000:3000"
+    networks:
+      - "defaultNet"
+    restart: "unless-stopped"
+
+  bazarr:
+    image: "lscr.io/linuxserver/bazarr"
+    container_name: bazarr
+    profiles: ['disabled']
+    environment:
+      <<: *common-env
+    volumes:
+      - ${DOCKER_CONFIG}/bazarr:/config
+      - ${ARR_BACKUPS}/bazarr:/config/backups
+      - ${FILESHARE}:/data
+    network_mode: "service:gluetun"
+    restart: "unless-stopped"
+    labels:
+      <<: *arr-labels
+      homepage.name: Bazarr
+      homepage.icon: bazarr.png
+      homepage.description: Download Subtitles
+      homepage.href: https://bazarr.${DOMAIN}
+      homepage.weight: 31
