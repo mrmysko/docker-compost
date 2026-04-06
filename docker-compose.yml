@@ -105,13 +105,10 @@ services:
       UPDATER_PERIOD: 48h
       OWNED_ONLY: on
     ports:
-      - 8000:8000/tcp # Homepage IP parse
       - 6555:6555/tcp # qBit WebUI
-      - 6868:6868/tcp # Profilarr
       - 9898:9898/tcp # Radarr TLS
       - 9897:9897/tcp # Sonarr TLS
       - 6969:6969/tcp # Prowlarr TLS
-      - 9705:9705/tcp # Huntarr
     volumes:
       - "gluetun.conf:/gluetun"
     cap_add:
