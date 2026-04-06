@@ -78,3 +78,22 @@ services:
       homepage.description: Download Subtitles
       homepage.href: https://bazarr.${DOMAIN}
       homepage.weight: 31
+
+  huntarr:
+    image: "huntarr/huntarr:9.2.0"
+    container_name: huntarr
+    profiles: ['arr']
+    user: ${PUID}:${PGID}
+    environment:
+      <<: *common-env
+    volumes:
+      - "huntarr.conf:/config"
+    network_mode: "service:gluetun"
+    restart: "unless-stopped"
+    labels:
+      <<: *arr-labels
+      homepage.name: Huntarr
+      homepage.icon: huntarr.png
+      homepage.description: Fetch media upgrades
+      homepage.href: https://huntarr.${DOMAIN}
+      homepage.weight: 31

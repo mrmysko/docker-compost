@@ -6,17 +6,14 @@ x-common-env: &common-env
 
 x-certs-volume: &certs-volume ${CERTS}:/certs:ro
 
-x-not-arr-labels: &not-arr-labels
-  homepage.group: Stuff
-  homepage.showStats: false
-
-x-arr-labels: &arr-labels
-  homepage.group: Arr
-  homepage.showStats: false
-
 x-logging-labels: &logging-labels
   logging: promtail
   jobname: container_logs
+
+x-lockdown: &lockdown
+  read_only: true
+  security_opt:
+    - "no-new-privileges=true"
 
 services:
   tdarr:
@@ -33,14 +30,16 @@ services:
       nodeName: "TdarrServer"
       auth: false
       openBrowser: true
-      maxLogSizeMB: 10
+      maxLogSizeMB: 5
       cronPluginUpdate:
     volumes:
-      - ${DOCKER_CONFIG}/tdarr/server:/app/server
-      - ${DOCKER_CONFIG}/tdarr/configs:/app/configs
-      - ${DOCKER_CONFIG}/tdarr/logs:/app/logs
+      - "tdarr.server:/app/server"
+      - "tdarr.configs:/app/configs"
+      - ${DOCKER_CONFIG}/scripts:/scripts
       - ${FILESHARE}:/data
-      - ${DOCKER_CONFIG}/tdarr/transcode_cache:/temp
+    tmpfs:
+      - "/tmp:size=8g"
+      - "/app/logs:size=32m"
     ports:
       - 8265:8265 # webUI port
       - 8266:8266 # server port
@@ -52,14 +51,6 @@ services:
     devices:
       - /dev/dri/card0:/dev/dri/card0
       - /dev/dri/renderD128:/dev/dri/renderD128
-    labels:
-      <<: *not-arr-labels
-      homepage.name: Tdarr
-      homepage.icon: tdarr.png
-      homepage.description: Transcoding Pipeline
-      homepage.href: https://tdarr.${DOMAIN}
-      homepage.showStats: false
-      homepage.weight: 15
 
   jellyfin:
     image: "jellyfin/jellyfin:10.11"
@@ -74,8 +65,11 @@ services:
       - "jellyfin.conf:/config"
       # Media
       - ${FILESHARE}:/videos
+      # Metadata
+      - /media/metadata/jellyfin:/config/metadata
     tmpfs:
       - "/cache:uid=${PUID},gid=${PGID}"
+      - "/config/log:uid=${PUID},gid=${PGID},size=32m"
     ports:
       - 8096:8096/tcp
       - 8920:8920/tcp
@@ -87,14 +81,6 @@ services:
     devices:
       - /dev/dri/card0:/dev/dri/card0
       - /dev/dri/renderD128:/dev/dri/renderD128
-    labels:
-      <<: *not-arr-labels
-      homepage.name: Jellyfin
-      homepage.icon: jellyfin.png
-      homepage.description: Movies & TV Shows
-      homepage.href: https://jellyfin.${DOMAIN}
-      homepage.showStats: false
-      homepage.weight: 10
 
 ## Arr ##
   gluetun:
@@ -135,19 +121,13 @@ services:
     networks:
       - "arrNet"
     restart: "unless-stopped"
-    labels:
-      <<: *arr-labels
-      homepage.name: Gluetun
-      homepage.icon: mullvad.png
-      homepage.widget.type: gluetun
-      homepage.widget.url: http://docker.internal.${DOMAIN}:8000
-      homepage.weight: 10
 
   qbit:
     image: "11notes/qbittorrent:5.1.4"
     container_name: qbit
     profiles: ['arr']
     user: ${PUID}:${PGID}
+    <<: *lockdown
     environment:
       TZ: ${TZ}
     volumes:
@@ -157,20 +137,14 @@ services:
       - ${FILESHARE}/Downloads:/data/Downloads
     network_mode: "service:gluetun"
     restart: "unless-stopped"
-    labels:
-      <<: *arr-labels
-      homepage.name: qBittorrent
-      homepage.icon: qbittorrent.png
-      homepage.description: Torrent Client
-      homepage.href: https://qbit.${DOMAIN}
-      homepage.weight: 50
 
   sonarr:
-    image: "11notes/sonarr:4.0.15"
+    image: "11notes/sonarr:4.0.17"
     container_name: sonarr
     read_only: true
     profiles: ['arr']
     user: ${PUID}:${PGID}
+    <<: *lockdown
     environment:
       TZ: ${TZ}
     volumes:
@@ -180,18 +154,9 @@ services:
       - *certs-volume
     tmpfs:
       - "/tmp:uid=${PUID},gid=${PGID}"
+      - "/logs:uid=${PUID},gid=${PGID}"
     network_mode: "service:gluetun"
     restart: "unless-stopped"
-    labels:
-      <<: *arr-labels
-      homepage.name: Sonarr
-      homepage.icon: sonarr.png
-      homepage.description: Download TV Shows
-      homepage.href: https://sonarr.${DOMAIN}
-      homepage.weight: 30
-      homepage.widget.type: sonarr
-      homepage.widget.url: https://docker.internal.${DOMAIN}:9897
-      homepage.widget.key: ${SONARR_API_KEY}
 
   radarr:
     image: "11notes/radarr:6"
@@ -199,8 +164,9 @@ services:
     read_only: true
     profiles: ['arr']
     user: ${PUID}:${PGID}
+    <<: *lockdown
     environment:
-      TS: ${TZ}
+      TZ: ${TZ}
     volumes:
       - "radarr.etc:/radarr/etc"
       - ${ARR_BACKUPS}/radarr:/config/backups
@@ -208,18 +174,9 @@ services:
       - *certs-volume
     tmpfs:
       - "/tmp:uid=${PUID},gid=${PGID}"
+      - "/logs:uid=${PUID},gid=${PGID}"
     network_mode: "service:gluetun"
     restart: "unless-stopped"
-    labels:
-      <<: *arr-labels
-      homepage.name: Radarr
-      homepage.icon: radarr.png
-      homepage.description: Download Movies
-      homepage.href: https://radarr.${DOMAIN}
-      homepage.weight: 30
-      homepage.widget.type: radarr
-      homepage.widget.url: https://docker.internal.${DOMAIN}:9898
-      homepage.widget.key: ${RADARR_API_KEY}
 
   prowlarr:
     image: "11notes/prowlarr:2.3.0"
@@ -227,6 +184,7 @@ services:
     read_only: true
     profiles: ['arr']
     user: ${PUID}:${PGID}
+    <<: *lockdown
     environment:
       TZ: ${TZ}
     volumes:
@@ -235,41 +193,16 @@ services:
       - *certs-volume
     tmpfs:
       - "/tmp:uid=${PUID},gid=${PGID}"
+      - "/logs:uid=${PUID},gid=${PGID}"
     network_mode: "service:gluetun"
     restart: "unless-stopped"
-    labels:
-      <<: *arr-labels
-      homepage.name: Prowlarr
-      homepage.icon: prowlarr.png
-      homepage.description: Index Manager
-      homepage.href: https://prowlarr.${DOMAIN}
-      homepage.weight: 31
-
-  huntarr:
-    image: "huntarr/huntarr:9.2.0"
-    container_name: huntarr
-    profiles: ['arr']
-    user: ${PUID}:${PGID}
-    environment:
-      <<: *common-env
-    volumes:
-      - "huntarr.conf:/config"
-    network_mode: "service:gluetun"
-    restart: "unless-stopped"
-    labels:
-      <<: *arr-labels
-      homepage.name: Huntarr
-      homepage.icon: huntarr.png
-      homepage.description: Fetch media upgrades
-      homepage.href: https://huntarr.${DOMAIN}
-      homepage.weight: 31
 
 # -----END------
 
   immich-machine-learning:
     container_name: immich_machine_learning
     profiles: ['immich']
-    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}-openvino
+    image: ghcr.io/immich-app/immich-machine-learning:v2.6.1-openvino
     volumes:
       - "immich_model-cache:/cache"
     env_file:
@@ -289,6 +222,8 @@ services:
       disable: false
 
 volumes:
+  tdarr.server:
+  tdarr.configs:
   jellyfin.conf:
   gluetun.conf:
   qbittorrent.etc:
@@ -296,9 +231,7 @@ volumes:
   sonarr.etc:
   radarr.etc:
   prowlarr.etc:
-  huntarr.conf:
   immich_model-cache:
-    external: true
 
 networks:
   defaultNet:
