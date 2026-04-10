@@ -105,10 +105,11 @@ services:
       UPDATER_PERIOD: 48h
       OWNED_ONLY: on
     ports:
+      - 8000:8000/tcp # HTTP Control
       - 6555:6555/tcp # qBit WebUI
-      - 9898:9898/tcp # Radarr TLS
-      - 9897:9897/tcp # Sonarr TLS
-      - 6969:6969/tcp # Prowlarr TLS
+      - ${RADARR_SERVER_SSLPORT}:${RADARR_SERVER_SSLPORT}/tcp
+      - ${SONARR_SERVER_SSLPORT}:${SONARR_SERVER_SSLPORT}/tcp
+      - ${PROWLARR_SERVER_SSLPORT}:${PROWLARR_SERVER_SSLPORT}/tcp
     volumes:
       - "gluetun.conf:/gluetun"
     cap_add:
@@ -138,12 +139,25 @@ services:
   sonarr:
     image: "11notes/sonarr:4.0.17"
     container_name: sonarr
-    read_only: true
     profiles: ['arr']
     user: ${PUID}:${PGID}
     <<: *lockdown
     environment:
       TZ: ${TZ}
+      SONARR__APP__THEME: "light"
+      SONARR__LOG__LEVEL: "${SONARR_LOG_LEVEL}"
+      SONARR__LOG__DBENABLED: "${SONARR_LOG_DBENABLED}"
+      SONARR__LOG__ANALYTICSENABLED: "false"
+      SONARR__POSTGRES__HOST: "${SONARR_POSTGRES_HOST}"
+      SONARR__POSTGRES__PORT: "${SONARR_POSTGRES_PORT}"
+      SONARR__POSTGRES__USER: "${SONARR_POSTGRES_USER}"
+      SONARR__POSTGRES__PASSWORD: "${SONARR_POSTGRES_PASSWORD}"
+      SONARR__POSTGRES__MAINDB: "${SONARR_POSTGRES_MAINDB}"
+      SONARR__SERVER__ENABLESSL: "true"
+      SONARR__SERVER__SSLPORT: "${SONARR_SERVER_SSLPORT}"
+      SONARR__SERVER__SSLCERTPATH: "/certs/docker.pfx"
+      SONARR__SERVER__SSLCERTPASSWORD: "${CERT_PASSWORD}"
+      SONARR__SERVER__PORT: "8989"
     volumes:
       - "sonarr.etc:/sonarr/etc"
       - ${ARR_BACKUPS}/sonarr:/config/backups
@@ -157,13 +171,26 @@ services:
 
   radarr:
     image: "11notes/radarr:6"
-    container_name: radarr
-    read_only: true
+    container_name: "radarr"
     profiles: ['arr']
     user: ${PUID}:${PGID}
     <<: *lockdown
     environment:
       TZ: ${TZ}
+      RADARR__APP__THEME: "light"
+      RADARR__LOG__LEVEL: "${RADARR_LOG_LEVEL}"
+      RADARR__LOG__DBENABLED: "${RADARR_LOG_DBENABLED}"
+      RADARR__LOG__ANALYTICSENABLED: "false"
+      RADARR__POSTGRES__HOST: "${RADARR_POSTGRES_HOST}"
+      RADARR__POSTGRES__PORT: "${RADARR_POSTGRES_PORT}"
+      RADARR__POSTGRES__USER: "${RADARR_POSTGRES_USER}"
+      RADARR__POSTGRES__PASSWORD: "${RADARR_POSTGRES_PASSWORD}"
+      RADARR__POSTGRES__MAINDB: "${RADARR_POSTGRES_MAINDB}"
+      RADARR__SERVER__ENABLESSL: "true"
+      RADARR__SERVER__SSLPORT: "${RADARR_SERVER_SSLPORT}"
+      RADARR__SERVER__SSLCERTPATH: "/certs/docker.pfx"
+      RADARR__SERVER__SSLCERTPASSWORD: "${CERT_PASSWORD}"
+      RADARR__SERVER__PORT: "7878"
     volumes:
       - "radarr.etc:/radarr/etc"
       - ${ARR_BACKUPS}/radarr:/config/backups
@@ -178,12 +205,25 @@ services:
   prowlarr:
     image: "11notes/prowlarr:2.3.0"
     container_name: prowlarr
-    read_only: true
     profiles: ['arr']
     user: ${PUID}:${PGID}
     <<: *lockdown
     environment:
       TZ: ${TZ}
+      PROWLARR__APP__THEME: "light"
+      PROWLARR__LOG__LEVEL: "${PROWLARR_LOG_LEVEL}"
+      PROWLARR__LOG__DBENABLED: "${PROWLARR_LOG_DBENABLED}"
+      PROWLARR__LOG__ANALYTICSENABLED: "false"
+      PROWLARR__POSTGRES__HOST: "${PROWLARR_POSTGRES_HOST}"
+      PROWLARR__POSTGRES__PORT: "${PROWLARR_POSTGRES_PORT}"
+      PROWLARR__POSTGRES__USER: "${PROWLARR_POSTGRES_USER}"
+      PROWLARR__POSTGRES__PASSWORD: "${PROWLARR_POSTGRES_PASSWORD}"
+      PROWLARR__POSTGRES__MAINDB: "${PROWLARR_POSTGRES_MAINDB}"
+      PROWLARR__SERVER__ENABLESSL: "true"
+      PROWLARR__SERVER__SSLPORT: "${PROWLARR_SERVER_SSLPORT}"
+      PROWLARR__SERVER__SSLCERTPATH: "/certs/docker.pfx"
+      PROWLARR__SERVER__SSLCERTPASSWORD: "${CERT_PASSWORD}"
+      PROWLARR__SERVER__PORT: "9696"
     volumes:
       - "prowlarr.etc:/prowlarr/etc"
       - ${ARR_BACKUPS}/prowlarr:/config/backups
