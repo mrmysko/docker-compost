@@ -6,16 +6,30 @@ x-common-env: &common-env
 
 x-certs-volume: &certs-volume ${CERTS}:/certs:ro
 
-x-logging-labels: &logging-labels
-  logging: promtail
-  jobname: container_logs
-
 x-lockdown: &lockdown
   read_only: true
   security_opt:
     - "no-new-privileges=true"
 
 services:
+  llama:
+    image: "ghcr.io/ggml-org/llama.cpp:full-intel"
+    container_name: llama
+    profiles:
+      - not-arr
+    environment:
+      <<: *common-env
+    volumes:
+      - /home/mysko/models:/models
+    networks:
+      - "defaultNet"
+    restart: unless-stopped
+    group_add:
+      - '105'
+    devices:
+      - /dev/dri/card0:/dev/dri/card0
+      - /dev/dri/renderD128:/dev/dri/renderD128
+
   tdarr:
     image: "ghcr.io/haveagitgat/tdarr:latest"
     container_name: tdarr
@@ -38,7 +52,7 @@ services:
       - ${DOCKER_CONFIG}/scripts:/scripts
       - ${FILESHARE}:/data
     tmpfs:
-      - "/tmp:size=8g"
+      - "/tmp:size=24g"
       - "/app/logs:size=32m"
     ports:
       - 8265:8265 # webUI port
@@ -131,6 +145,7 @@ services:
     volumes:
       - "qbittorrent.etc:/qbittorrent/etc"
       - "qbittorrent.var:/qbittorrent/var"
+      - "qbittorrent.themes:/qbittorrent/themes"
       # To conform with arrs directory mappings without using path mappings
       - ${FILESHARE}/Downloads:/data/Downloads
     network_mode: "service:gluetun"
@@ -160,7 +175,6 @@ services:
       SONARR__SERVER__PORT: "8989"
     volumes:
       - "sonarr.etc:/sonarr/etc"
-      - ${ARR_BACKUPS}/sonarr:/config/backups
       - ${FILESHARE}:/data
       - *certs-volume
     tmpfs:
@@ -193,7 +207,6 @@ services:
       RADARR__SERVER__PORT: "7878"
     volumes:
       - "radarr.etc:/radarr/etc"
-      - ${ARR_BACKUPS}/radarr:/config/backups
       - ${FILESHARE}:/data
       - *certs-volume
     tmpfs:
@@ -203,7 +216,7 @@ services:
     restart: "unless-stopped"
 
   prowlarr:
-    image: "11notes/prowlarr:2.3.0"
+    image: "11notes/prowlarr:2.3"
     container_name: prowlarr
     profiles: ['arr']
     user: ${PUID}:${PGID}
@@ -226,7 +239,6 @@ services:
       PROWLARR__SERVER__PORT: "9696"
     volumes:
       - "prowlarr.etc:/prowlarr/etc"
-      - ${ARR_BACKUPS}/prowlarr:/config/backups
       - *certs-volume
     tmpfs:
       - "/tmp:uid=${PUID},gid=${PGID}"
@@ -241,7 +253,7 @@ services:
     profiles: ['immich']
     image: ghcr.io/immich-app/immich-machine-learning:v2.7.3-openvino
     volumes:
-      - "immich_model-cache:/cache"
+      - "immich.model-cache:/cache"
     # External access
     ports:
       - 3003:3003
@@ -263,10 +275,11 @@ volumes:
   gluetun.conf:
   qbittorrent.etc:
   qbittorrent.var:
+  qbittorrent.themes:
   sonarr.etc:
   radarr.etc:
   prowlarr.etc:
-  immich_model-cache:
+  immich.model-cache:
 
 networks:
   defaultNet:
