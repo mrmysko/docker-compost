@@ -12,28 +12,11 @@ x-lockdown: &lockdown
     - "no-new-privileges=true"
 
 services:
-  llama:
-    image: "ghcr.io/ggml-org/llama.cpp:full-intel"
-    container_name: llama
-    profiles:
-      - not-arr
-    environment:
-      <<: *common-env
-    volumes:
-      - /home/mysko/models:/models
-    networks:
-      - "defaultNet"
-    restart: unless-stopped
-    group_add:
-      - '105'
-    devices:
-      - /dev/dri/card0:/dev/dri/card0
-      - /dev/dri/renderD128:/dev/dri/renderD128
-
   tdarr:
     image: "ghcr.io/haveagitgat/tdarr:latest"
     container_name: tdarr
-    profiles: ['not-arr']
+    profiles:
+      - not-arr
     environment:
       <<: *common-env
       serverUrl: ${TDARR_URL}
@@ -70,7 +53,8 @@ services:
     image: "jellyfin/jellyfin:10.11"
     container_name: jellyfin
     hostname: jellyfin
-    profiles: ['not-arr']
+    profiles:
+      - not-arr
     user: ${PUID}:${PGID}
     environment:
       <<: *common-env
@@ -100,7 +84,8 @@ services:
   gluetun:
     image: "qmcgaw/gluetun:v3"
     container_name: gluetun
-    profiles: ['arr']
+    profiles:
+      - arr
     environment:
       <<: *common-env
       # Mullvad-WG
@@ -137,7 +122,8 @@ services:
   qbit:
     image: "11notes/qbittorrent:5.1.4"
     container_name: qbit
-    profiles: ['arr']
+    profiles:
+      - arr
     user: ${PUID}:${PGID}
     <<: *lockdown
     environment:
@@ -154,7 +140,8 @@ services:
   sonarr:
     image: "11notes/sonarr:4.0.17"
     container_name: sonarr
-    profiles: ['arr']
+    profiles:
+      - arr
     user: ${PUID}:${PGID}
     <<: *lockdown
     environment:
@@ -186,7 +173,8 @@ services:
   radarr:
     image: "11notes/radarr:6"
     container_name: "radarr"
-    profiles: ['arr']
+    profiles:
+      - arr
     user: ${PUID}:${PGID}
     <<: *lockdown
     environment:
@@ -218,7 +206,8 @@ services:
   prowlarr:
     image: "11notes/prowlarr:2.3"
     container_name: prowlarr
-    profiles: ['arr']
+    profiles:
+      - arr
     user: ${PUID}:${PGID}
     <<: *lockdown
     environment:
@@ -248,9 +237,29 @@ services:
 
 # -----END------
 
+  llama:
+    image: "ghcr.io/ggml-org/llama.cpp:full-intel"
+    container_name: llama
+    profiles:
+      - not-arr
+    environment:
+      <<: *common-env
+    volumes:
+      - /home/mysko/models:/models
+    networks:
+      - "defaultNet"
+    restart: unless-stopped
+    group_add:
+      - '105'
+    devices:
+      - /dev/dri/card0:/dev/dri/card0
+      - /dev/dri/renderD128:/dev/dri/renderD128
+
   immich-machine-learning:
     container_name: immich_machine_learning
-    profiles: ['immich']
+    profiles:
+      - immich
+      - not-arr
     image: ghcr.io/immich-app/immich-machine-learning:v2.7.3-openvino
     volumes:
       - "immich.model-cache:/cache"
